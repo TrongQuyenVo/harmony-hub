@@ -1,5 +1,5 @@
-import { useRef, useEffect, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useRef, useEffect } from "react";
+import { motion } from "framer-motion";
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
   Volume2, VolumeX, Volume1, Mic2, Heart, ListMusic
@@ -7,6 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useLibraryStore } from "@/stores/libraryStore";
+import { fetchTrackPreview } from "@/services/deezerApi";
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -56,15 +57,36 @@ export default function MusicPlayer() {
     const audio = audioRef.current;
     if (!audio || !currentSong) return;
 
-    if (audio.src !== currentSong.preview) {
-      audio.src = currentSong.preview;
-      audio.load();
-      addToRecentlyPlayed(currentSong);
-    }
+    const loadAndPlay = async () => {
+      let previewUrl = currentSong.preview;
+      
+      // If no preview URL, fetch it from Deezer
+      if (!previewUrl && currentSong.id.startsWith("dz-")) {
+        previewUrl = await fetchTrackPreview(currentSong.id);
+      }
+      
+      if (!previewUrl) {
+        console.warn("No preview URL available for", currentSong.title);
+        setPlaying(false);
+        return;
+      }
 
-    if (isPlaying) {
-      audio.play().catch(() => setPlaying(false));
-    } else {
+      if (audio.src !== previewUrl) {
+        audio.src = previewUrl;
+        audio.load();
+        addToRecentlyPlayed(currentSong);
+      }
+
+      if (isPlaying) {
+        audio.play().catch(() => setPlaying(false));
+      }
+    };
+
+    if (isPlaying || audio.src !== currentSong.preview) {
+      loadAndPlay();
+    }
+    
+    if (!isPlaying && audio.src) {
       audio.pause();
     }
   }, [currentSong, isPlaying]);

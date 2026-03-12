@@ -1,5 +1,5 @@
 import { Song, Artist } from "@/types/music";
-import { mockSongs, mockArtists } from "@/data/mockData";
+import { mockSongs, mockArtists, DEEZER_TRACK_IDS } from "@/data/mockData";
 
 const DEEZER_BASE = "https://api.deezer.com";
 
@@ -8,7 +8,7 @@ interface DeezerTrack {
   title: string;
   duration: number;
   preview: string;
-  artist: { id: number; name: string; picture_xl?: string };
+  artist: { id: number; name: string; picture_xl?: string; picture_big?: string };
   album: { id: number; title: string; cover_xl?: string; cover_big?: string };
   rank: number;
 }
@@ -22,106 +22,141 @@ function mapDeezerTrack(track: DeezerTrack): Song {
     album: track.album.title,
     albumId: `dz-al-${track.album.id}`,
     cover: track.album.cover_xl || track.album.cover_big || "/placeholder.svg",
-    preview: track.preview,
+    preview: track.preview || "",
     duration: track.duration,
     plays: track.rank,
   };
 }
 
-// Try multiple CORS proxies, fallback to mock data
-async function fetchWithProxy(url: string): Promise<Response | null> {
-  const proxies = [
-    `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-    `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
-  ];
+// Use JSONP to bypass CORS - Deezer supports ?output=jsonp&callback=
+let jsonpCounter = 0;
 
-  for (const proxyUrl of proxies) {
-    try {
-      const res = await fetch(proxyUrl, { signal: AbortSignal.timeout(5000) });
-      if (res.ok) return res;
-    } catch {
-      continue;
-    }
-  }
+function fetchJsonp<T>(url: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const callbackName = `__deezer_cb_${++jsonpCounter}_${Date.now()}`;
+    const script = document.createElement("script");
+    
+    const cleanup = () => {
+      delete (window as any)[callbackName];
+      if (script.parentNode) script.parentNode.removeChild(script);
+    };
 
-  // Try direct (some Deezer endpoints allow CORS)
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
-    if (res.ok) return res;
-  } catch {
-    // ignore
-  }
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error("JSONP timeout"));
+    }, 8000);
 
-  return null;
+    (window as any)[callbackName] = (data: T) => {
+      clearTimeout(timeout);
+      cleanup();
+      resolve(data);
+    };
+
+    const separator = url.includes("?") ? "&" : "?";
+    script.src = `${url}${separator}output=jsonp&callback=${callbackName}`;
+    script.onerror = () => {
+      clearTimeout(timeout);
+      cleanup();
+      reject(new Error("JSONP error"));
+    };
+    document.head.appendChild(script);
+  });
 }
 
 export async function fetchTrendingSongs(): Promise<Song[]> {
   try {
-    const res = await fetchWithProxy(`${DEEZER_BASE}/chart/0/tracks?limit=20`);
-    if (res) {
-      const data = await res.json();
-      if (data.data && Array.isArray(data.data)) {
-        const songs = data.data
-          .filter((t: DeezerTrack) => t.preview)
-          .map(mapDeezerTrack);
-        if (songs.length > 0) return songs;
-      }
+    const data = await fetchJsonp<{ data: DeezerTrack[] }>(
+      `${DEEZER_BASE}/chart/0/tracks?limit=20`
+    );
+    if (data.data && Array.isArray(data.data)) {
+      const songs = data.data.filter(t => t.preview).map(mapDeezerTrack);
+      if (songs.length > 0) return songs;
     }
-  } catch {
-    // fallback
+  } catch (e) {
+    console.log("Deezer chart fetch failed, using mock data", e);
   }
-  return mockSongs;
+  // Fallback: try to fetch individual tracks to get preview URLs
+  return fetchTrackPreviews(mockSongs);
 }
 
 export async function searchDeezer(query: string): Promise<Song[]> {
   try {
-    const res = await fetchWithProxy(`${DEEZER_BASE}/search?q=${encodeURIComponent(query)}&limit=20`);
-    if (res) {
-      const data = await res.json();
-      if (data.data && Array.isArray(data.data)) {
-        const songs = data.data
-          .filter((t: DeezerTrack) => t.preview)
-          .map(mapDeezerTrack);
-        if (songs.length > 0) return songs;
-      }
+    const data = await fetchJsonp<{ data: DeezerTrack[] }>(
+      `${DEEZER_BASE}/search?q=${encodeURIComponent(query)}&limit=20`
+    );
+    if (data.data && Array.isArray(data.data)) {
+      const songs = data.data.filter(t => t.preview).map(mapDeezerTrack);
+      if (songs.length > 0) return songs;
     }
-  } catch {
-    // fallback
+  } catch (e) {
+    console.log("Deezer search failed, using mock filter", e);
   }
+  const q = query.toLowerCase();
   return mockSongs.filter(s =>
-    s.title.toLowerCase().includes(query.toLowerCase()) ||
-    s.artist.toLowerCase().includes(query.toLowerCase())
+    s.title.toLowerCase().includes(q) ||
+    s.artist.toLowerCase().includes(q)
+  );
+}
+
+// Fetch a single track to get its fresh preview URL
+export async function fetchTrackPreview(trackId: string): Promise<string> {
+  const numericId = trackId.replace("dz-", "");
+  try {
+    const data = await fetchJsonp<DeezerTrack>(
+      `${DEEZER_BASE}/track/${numericId}`
+    );
+    if (data.preview) return data.preview;
+  } catch {
+    // ignore
+  }
+  return "";
+}
+
+// Batch fetch preview URLs for mock songs
+async function fetchTrackPreviews(songs: Song[]): Promise<Song[]> {
+  const results = await Promise.allSettled(
+    songs.map(async (song) => {
+      const numericId = song.id.replace("dz-", "");
+      try {
+        const data = await fetchJsonp<DeezerTrack>(
+          `${DEEZER_BASE}/track/${numericId}`
+        );
+        return { ...song, preview: data.preview || "" };
+      } catch {
+        return song;
+      }
+    })
+  );
+
+  return results.map((r, i) =>
+    r.status === "fulfilled" ? r.value : songs[i]
   );
 }
 
 export async function fetchArtistDetails(artistId: string): Promise<Artist | null> {
   const mockArtist = mockArtists.find(a => a.id === artistId);
-  if (mockArtist) return mockArtist;
 
-  if (artistId.startsWith("dz-a-")) {
-    const dzId = artistId.replace("dz-a-", "");
-    try {
-      const res = await fetchWithProxy(`${DEEZER_BASE}/artist/${dzId}`);
-      if (!res) return null;
-      const data = await res.json();
+  const dzId = artistId.replace("dz-a-", "");
+  
+  try {
+    const data = await fetchJsonp<any>(`${DEEZER_BASE}/artist/${dzId}`);
+    const topData = await fetchJsonp<{ data: DeezerTrack[] }>(
+      `${DEEZER_BASE}/artist/${dzId}/top?limit=10`
+    );
 
-      const topRes = await fetchWithProxy(`${DEEZER_BASE}/artist/${dzId}/top?limit=10`);
-      const topSongs = topRes
-        ? (await topRes.json()).data?.filter((t: DeezerTrack) => t.preview).map(mapDeezerTrack) || []
-        : [];
-
-      return {
-        id: artistId,
-        name: data.name,
-        image: data.picture_xl || data.picture_big || "/placeholder.svg",
-        bio: `${data.name} has ${data.nb_fan?.toLocaleString()} fans on Deezer.`,
-        followers: data.nb_fan || 0,
-        topSongs,
-        albums: [],
-      };
-    } catch {
-      return null;
-    }
+    return {
+      id: artistId,
+      name: data.name || mockArtist?.name || "Unknown",
+      image: data.picture_xl || data.picture_big || mockArtist?.image || "/placeholder.svg",
+      bio: data.nb_fan
+        ? `${data.name} has ${data.nb_fan.toLocaleString()} fans worldwide.`
+        : mockArtist?.bio || "",
+      followers: data.nb_fan || mockArtist?.followers || 0,
+      topSongs: topData.data?.filter((t: DeezerTrack) => t.preview).map(mapDeezerTrack) || mockArtist?.topSongs || [],
+      albums: [],
+    };
+  } catch {
+    if (mockArtist) return mockArtist;
+    return null;
   }
-  return null;
 }
