@@ -1,22 +1,38 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import Index from "./pages/Index.tsx";
-import NotFound from "./pages/NotFound.tsx";
+import Layout from "@/components/Layout";
+import HomePage from "@/pages/Index";
+import SearchPage from "@/pages/SearchPage";
+import ChartsPage from "@/pages/ChartsPage";
+import ArtistsPage from "@/pages/ArtistsPage";
+import ArtistPage from "@/pages/ArtistPage";
+import PlaylistsPage from "@/pages/PlaylistsPage";
+import PlaylistPage from "@/pages/PlaylistPage";
+import LikedSongsPage from "@/pages/LikedSongsPage";
+import RecentPage from "@/pages/RecentPage";
+import NotFound from "@/pages/NotFound";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
-      <Toaster />
       <Sonner />
       <BrowserRouter>
         <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+          <Route element={<Layout />}>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/search" element={<SearchPage />} />
+            <Route path="/charts" element={<ChartsPage />} />
+            <Route path="/artists" element={<ArtistsPage />} />
+            <Route path="/artist/:id" element={<ArtistPage />} />
+            <Route path="/playlists" element={<PlaylistsPage />} />
+            <Route path="/playlist/:id" element={<PlaylistPage />} />
+            <Route path="/liked" element={<LikedSongsPage />} />
+            <Route path="/recent" element={<RecentPage />} />
+          </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
