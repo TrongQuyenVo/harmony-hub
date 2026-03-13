@@ -5,24 +5,32 @@ import MusicCard from "@/components/MusicCard";
 import ArtistCard from "@/components/ArtistCard";
 import PlaylistCard from "@/components/PlaylistCard";
 import { usePlayerStore } from "@/stores/playerStore";
-import { fetchTrendingSongs, fetchTrendingArtists, fetchTrendingPlaylists } from "@/services/deezerApi";
+import { fetchTrendingSongs, fetchTrendingArtists, fetchTrendingPlaylists, fetchVietnameseChart, fetchChineseChart } from "@/services/deezerApi";
 import { genres } from "@/data/genres";
 import { Song, Artist, Playlist } from "@/types/music";
 
 export default function HomePage() {
   const [trending, setTrending] = useState<Song[]>([]);
+  const [vietSongs, setVietSongs] = useState<Song[]>([]);
+  const [chineseSongs, setChineseSongs] = useState<Song[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const { playSong } = usePlayerStore();
 
   useEffect(() => {
     async function load() {
-      const songs = await fetchTrendingSongs();
+      const [songs, artistsData, playlistsData, viet, chinese] = await Promise.all([
+        fetchTrendingSongs(),
+        fetchTrendingArtists(),
+        fetchTrendingPlaylists(),
+        fetchVietnameseChart(),
+        fetchChineseChart(),
+      ]);
       setTrending(songs);
-      const artistsData = await fetchTrendingArtists();
       setArtists(artistsData);
-      const playlistsData = await fetchTrendingPlaylists();
       setPlaylists(playlistsData);
+      setVietSongs(viet);
+      setChineseSongs(chinese);
     }
 
     load();
@@ -74,6 +82,36 @@ export default function HomePage() {
           ))}
         </div>
       </section>
+
+      {/* Nhạc Việt */}
+      {vietSongs.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-lg">🇻🇳</span>
+            <h2 className="text-xl font-bold text-foreground">Nhạc Việt Hot</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {vietSongs.slice(0, 12).map((song, i) => (
+              <MusicCard key={song.id} song={song} queue={vietSongs} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Nhạc Trung */}
+      {chineseSongs.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-lg">🇨🇳</span>
+            <h2 className="text-xl font-bold text-foreground">Nhạc Trung Hot</h2>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {chineseSongs.slice(0, 12).map((song, i) => (
+              <MusicCard key={song.id} song={song} queue={chineseSongs} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Browse genres */}
       <section>
