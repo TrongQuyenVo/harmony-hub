@@ -92,11 +92,11 @@ export default function MusicPlayer() {
     setVolume(pct);
   };
 
+  const liked = currentSong ? isLiked(currentSong.id) : false;
+
   if (!currentSong) return (
     <div id={ytPlayer.containerId} className="hidden" />
   );
-
-  const liked = isLiked(currentSong.id);
   const progressPct = duration > 0 ? (progress / duration) * 100 : 0;
 
   return (
