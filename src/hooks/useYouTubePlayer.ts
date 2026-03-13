@@ -12,6 +12,7 @@ interface UseYouTubePlayerOptions {
   onDuration?: (duration: number) => void;
   onEnded?: () => void;
   onPlaying?: (playing: boolean) => void;
+  onError?: () => void;
 }
 
 export function useYouTubePlayer(options: UseYouTubePlayerOptions) {
@@ -21,7 +22,7 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions) {
   const optionsRef = useRef(options);
   optionsRef.current = options;
   const readyRef = useRef(false);
-  const pendingVideoRef = useRef<string | null>(null);
+  const pendingSearchRef = useRef<string | null>(null);
 
   const createPlayer = useCallback(async () => {
     await loadYouTubeAPI();
@@ -46,9 +47,9 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions) {
       events: {
         onReady: () => {
           readyRef.current = true;
-          if (pendingVideoRef.current) {
-            playerRef.current.loadVideoById(pendingVideoRef.current);
-            pendingVideoRef.current = null;
+          if (pendingSearchRef.current) {
+            searchAndPlay(pendingSearchRef.current);
+            pendingSearchRef.current = null;
           }
         },
         onStateChange: (event: any) => {
@@ -72,16 +73,27 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions) {
         },
         onError: (event: any) => {
           console.warn("YouTube player error:", event.data);
+          optionsRef.current.onError?.();
         },
       },
     });
   }, []);
 
-  const loadVideo = useCallback((videoId: string) => {
-    if (readyRef.current && playerRef.current?.loadVideoById) {
-      playerRef.current.loadVideoById(videoId);
-    } else {
-      pendingVideoRef.current = videoId;
+  // Use YouTube's built-in search via loadPlaylist
+  const searchAndPlay = useCallback((query: string) => {
+    if (!readyRef.current || !playerRef.current) {
+      pendingSearchRef.current = query;
+      return;
+    }
+    try {
+      // Use cuePlaylist with listType 'search' to find and play
+      playerRef.current.loadPlaylist({
+        listType: "search",
+        list: query,
+      });
+    } catch (e) {
+      console.warn("YouTube search failed:", e);
+      optionsRef.current.onError?.();
     }
   }, []);
 
@@ -101,10 +113,6 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions) {
     playerRef.current?.setVolume?.(vol * 100);
   }, []);
 
-  const getState = useCallback((): number => {
-    return playerRef.current?.getPlayerState?.() ?? -1;
-  }, []);
-
   useEffect(() => {
     createPlayer();
     return () => {
@@ -117,11 +125,10 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions) {
 
   return {
     containerId: containerIdRef.current,
-    loadVideo,
+    searchAndPlay,
     play,
     pause,
     seekTo,
     setVolume,
-    getState,
   };
 }

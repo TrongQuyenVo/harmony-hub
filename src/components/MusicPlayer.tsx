@@ -8,7 +8,6 @@ import { cn } from "@/lib/utils";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useLibraryStore } from "@/stores/libraryStore";
 import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
-import { getVideoIdForSong } from "@/services/youtubeService";
 
 function formatTime(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -42,18 +41,18 @@ export default function MusicPlayer() {
       setPlaying(playing);
       if (loading) setLoading(false);
     },
+    onError: () => {
+      setLoading(false);
+      setPlaying(false);
+    },
   });
 
   // Load video when song changes
   useEffect(() => {
     if (!currentSong) return;
     if (lastSongIdRef.current === currentSong.id) {
-      // Same song, just toggle play/pause
-      if (isPlaying) {
-        ytPlayer.play();
-      } else {
-        ytPlayer.pause();
-      }
+      if (isPlaying) ytPlayer.play();
+      else ytPlayer.pause();
       return;
     }
 
@@ -61,27 +60,17 @@ export default function MusicPlayer() {
     setLoading(true);
     addToRecentlyPlayed(currentSong);
 
-    (async () => {
-      const videoId = await getVideoIdForSong(currentSong.title, currentSong.artist);
-      if (videoId) {
-        ytPlayer.loadVideo(videoId);
-      } else {
-        console.warn("Could not find YouTube video for:", currentSong.title);
-        setLoading(false);
-        setPlaying(false);
-      }
-    })();
+    // Search YouTube directly using the built-in search
+    const query = `${currentSong.title} ${currentSong.artist} official`;
+    ytPlayer.searchAndPlay(query);
   }, [currentSong?.id]);
 
   // Handle play/pause toggle
   useEffect(() => {
     if (!currentSong || loading) return;
-    if (lastSongIdRef.current !== currentSong.id) return; // loading new song
-    if (isPlaying) {
-      ytPlayer.play();
-    } else {
-      ytPlayer.pause();
-    }
+    if (lastSongIdRef.current !== currentSong.id) return;
+    if (isPlaying) ytPlayer.play();
+    else ytPlayer.pause();
   }, [isPlaying]);
 
   // Volume sync
@@ -112,7 +101,6 @@ export default function MusicPlayer() {
 
   return (
     <>
-      {/* Hidden YouTube player */}
       <div id={ytPlayer.containerId} className="fixed -top-[100px] -left-[100px] w-[1px] h-[1px] opacity-0 pointer-events-none" />
 
       <motion.div
@@ -128,41 +116,28 @@ export default function MusicPlayer() {
                 src={currentSong.cover}
                 alt={currentSong.title}
                 className="w-full h-full object-cover"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).src = "/placeholder.svg";
-                }}
+                onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
               />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-foreground line-clamp-1">{currentSong.title}</p>
               <p className="text-xs text-muted-foreground line-clamp-1">{currentSong.artist}</p>
             </div>
-            <button
-              onClick={() => toggleLike(currentSong)}
-              className="hidden sm:flex ml-2 flex-shrink-0"
-            >
-              <Heart
-                className={cn("w-4 h-4 transition-colors", liked ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground")}
-              />
+            <button onClick={() => toggleLike(currentSong)} className="hidden sm:flex ml-2 flex-shrink-0">
+              <Heart className={cn("w-4 h-4 transition-colors", liked ? "fill-primary text-primary" : "text-muted-foreground hover:text-foreground")} />
             </button>
           </div>
 
           {/* Controls */}
           <div className="flex flex-col items-center flex-1 max-w-[600px]">
             <div className="flex items-center gap-2 md:gap-4">
-              <button
-                onClick={toggleShuffle}
-                className={cn("hidden sm:block p-1.5", shuffle ? "text-primary" : "text-muted-foreground hover:text-foreground")}
-              >
+              <button onClick={toggleShuffle} className={cn("hidden sm:block p-1.5", shuffle ? "text-primary" : "text-muted-foreground hover:text-foreground")}>
                 <Shuffle className="w-4 h-4" />
               </button>
               <button onClick={prevSong} className="p-1.5 text-foreground hover:text-primary transition-colors">
                 <SkipBack className="w-5 h-5" />
               </button>
-              <button
-                onClick={togglePlay}
-                className="w-9 h-9 md:w-10 md:h-10 rounded-full gradient-primary flex items-center justify-center shadow-glow hover:scale-105 transition-transform"
-              >
+              <button onClick={togglePlay} className="w-9 h-9 md:w-10 md:h-10 rounded-full gradient-primary flex items-center justify-center shadow-glow hover:scale-105 transition-transform">
                 {loading ? (
                   <Loader2 className="w-5 h-5 text-primary-foreground animate-spin" />
                 ) : isPlaying ? (
@@ -174,29 +149,15 @@ export default function MusicPlayer() {
               <button onClick={nextSong} className="p-1.5 text-foreground hover:text-primary transition-colors">
                 <SkipForward className="w-5 h-5" />
               </button>
-              <button
-                onClick={toggleRepeat}
-                className={cn("hidden sm:block p-1.5", repeat !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground")}
-              >
+              <button onClick={toggleRepeat} className={cn("hidden sm:block p-1.5", repeat !== "off" ? "text-primary" : "text-muted-foreground hover:text-foreground")}>
                 {repeat === "one" ? <Repeat1 className="w-4 h-4" /> : <Repeat className="w-4 h-4" />}
               </button>
             </div>
-
-            {/* Progress bar */}
             <div className="flex items-center gap-2 w-full mt-1">
               <span className="text-[10px] text-muted-foreground w-8 text-right">{formatTime(progress)}</span>
-              <div
-                className="flex-1 h-1 bg-muted rounded-full cursor-pointer group relative"
-                onClick={handleSeek}
-              >
-                <div
-                  className="absolute inset-y-0 left-0 bg-primary rounded-full group-hover:bg-primary"
-                  style={{ width: `${progressPct}%` }}
-                />
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ left: `calc(${progressPct}% - 6px)` }}
-                />
+              <div className="flex-1 h-1 bg-muted rounded-full cursor-pointer group relative" onClick={handleSeek}>
+                <div className="absolute inset-y-0 left-0 bg-primary rounded-full" style={{ width: `${progressPct}%` }} />
+                <div className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity" style={{ left: `calc(${progressPct}% - 6px)` }} />
               </div>
               <span className="text-[10px] text-muted-foreground w-8">{formatTime(duration)}</span>
             </div>
@@ -214,10 +175,7 @@ export default function MusicPlayer() {
               <button onClick={() => setVolume(volume === 0 ? 0.7 : 0)} className="text-muted-foreground hover:text-foreground">
                 {volume === 0 ? <VolumeX className="w-4 h-4" /> : volume < 0.5 ? <Volume1 className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
               </button>
-              <div
-                className="w-20 h-1 bg-muted rounded-full cursor-pointer group relative"
-                onClick={handleVolumeChange}
-              >
+              <div className="w-20 h-1 bg-muted rounded-full cursor-pointer group relative" onClick={handleVolumeChange}>
                 <div className="absolute inset-y-0 left-0 bg-foreground rounded-full" style={{ width: `${volume * 100}%` }} />
               </div>
             </div>
