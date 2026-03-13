@@ -19,12 +19,18 @@ export default function HomePage() {
 
   useEffect(() => {
     async function load() {
-      const songs = await fetchTrendingSongs();
+      const [songs, artistsData, playlistsData, viet, chinese] = await Promise.all([
+        fetchTrendingSongs(),
+        fetchTrendingArtists(),
+        fetchTrendingPlaylists(),
+        fetchVietnameseChart(),
+        fetchChineseChart(),
+      ]);
       setTrending(songs);
-      const artistsData = await fetchTrendingArtists();
       setArtists(artistsData);
-      const playlistsData = await fetchTrendingPlaylists();
       setPlaylists(playlistsData);
+      setVietSongs(viet);
+      setChineseSongs(chinese);
     }
 
     load();
