@@ -182,6 +182,34 @@ export async function fetchTrendingPlaylists(): Promise<Playlist[]> {
   return [];
 }
 
+export async function fetchVietnameseChart(): Promise<Song[]> {
+  try {
+    const data = await fetchJsonp<{ data: DeezerTrack[] }>(
+      `${DEEZER_BASE}/search?q=${encodeURIComponent("nhạc việt nam hot")}&limit=20`
+    );
+    if (data.data && Array.isArray(data.data)) {
+      return data.data.filter(t => t.preview).map(mapDeezerTrack);
+    }
+  } catch (e) {
+    console.warn("Failed to load Vietnamese chart", e);
+  }
+  return [];
+}
+
+export async function fetchChineseChart(): Promise<Song[]> {
+  try {
+    const data = await fetchJsonp<{ data: DeezerTrack[] }>(
+      `${DEEZER_BASE}/search?q=${encodeURIComponent("华语流行 热门")}&limit=20`
+    );
+    if (data.data && Array.isArray(data.data)) {
+      return data.data.filter(t => t.preview).map(mapDeezerTrack);
+    }
+  } catch (e) {
+    console.warn("Failed to load Chinese chart", e);
+  }
+  return [];
+}
+
 export async function searchArtists(query: string): Promise<Artist[]> {
   try {
     const data = await fetchJsonp<{ data: any[] }>(
