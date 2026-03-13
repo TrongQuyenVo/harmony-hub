@@ -3,16 +3,15 @@ import { motion } from "framer-motion";
 import { TrendingUp } from "lucide-react";
 import MusicCard from "@/components/MusicCard";
 import { fetchTrendingSongs } from "@/services/deezerApi";
-import { mockSongs } from "@/data/mockData";
 import { Song } from "@/types/music";
 
 export default function ChartsPage() {
-  const [songs, setSongs] = useState<Song[]>(mockSongs);
+  const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchTrendingSongs().then((s) => {
-      setSongs(s.length > 0 ? s : mockSongs);
+      setSongs(s);
       setLoading(false);
     });
   }, []);

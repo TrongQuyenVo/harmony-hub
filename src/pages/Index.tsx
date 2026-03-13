@@ -5,20 +5,27 @@ import MusicCard from "@/components/MusicCard";
 import ArtistCard from "@/components/ArtistCard";
 import PlaylistCard from "@/components/PlaylistCard";
 import { usePlayerStore } from "@/stores/playerStore";
-import { fetchTrendingSongs } from "@/services/deezerApi";
-import { mockSongs, mockArtists, mockPlaylists, genres } from "@/data/mockData";
-import { Song } from "@/types/music";
+import { fetchTrendingSongs, fetchTrendingArtists, fetchTrendingPlaylists } from "@/services/deezerApi";
+import { genres } from "@/data/genres";
+import { Song, Artist, Playlist } from "@/types/music";
 
 export default function HomePage() {
-  const [trending, setTrending] = useState<Song[]>(mockSongs);
-  const [loading, setLoading] = useState(true);
+  const [trending, setTrending] = useState<Song[]>([]);
+  const [artists, setArtists] = useState<Artist[]>([]);
+  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const { playSong } = usePlayerStore();
 
   useEffect(() => {
-    fetchTrendingSongs().then((songs) => {
-      setTrending(songs.length > 0 ? songs : mockSongs);
-      setLoading(false);
-    });
+    async function load() {
+      const songs = await fetchTrendingSongs();
+      setTrending(songs);
+      const artistsData = await fetchTrendingArtists();
+      setArtists(artistsData);
+      const playlistsData = await fetchTrendingPlaylists();
+      setPlaylists(playlistsData);
+    }
+
+    load();
   }, []);
 
   const handlePlayAll = () => {
@@ -87,24 +94,27 @@ export default function HomePage() {
       </section>
 
       {/* Featured playlists */}
-      <section>
-        <h2 className="text-xl font-bold text-foreground mb-4">Featured Playlists</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {mockPlaylists.map((pl, i) => (
-            <PlaylistCard key={pl.id} playlist={pl} index={i} />
-          ))}
-        </div>
-      </section>
+      {playlists.length > 0 && (
+        <section>
+          <h2 className="text-xl font-bold text-foreground mb-4">Featured Playlists</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {playlists.map((pl, i) => (
+              <PlaylistCard key={pl.id} playlist={pl} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
 
-      {/* Popular artists */}
-      <section>
-        <h2 className="text-xl font-bold text-foreground mb-4">Popular Artists</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {mockArtists.map((artist, i) => (
-            <ArtistCard key={artist.id} artist={artist} index={i} />
-          ))}
-        </div>
-      </section>
+      {artists.length > 0 && (
+        <section>
+          <h2 className="text-xl font-bold text-foreground mb-4">Popular Artists</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {artists.map((artist, i) => (
+              <ArtistCard key={artist.id} artist={artist} index={i} />
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Top charts as list */}
       <section>

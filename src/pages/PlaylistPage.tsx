@@ -1,17 +1,31 @@
 import { useParams } from "react-router-dom";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Play, Clock, Music } from "lucide-react";
 import MusicCard from "@/components/MusicCard";
-import { mockPlaylists } from "@/data/mockData";
+import { fetchPlaylist } from "@/services/deezerApi";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useLibraryStore } from "@/stores/libraryStore";
+import { Playlist } from "@/types/music";
 
 export default function PlaylistPage() {
   const { id } = useParams<{ id: string }>();
   const { playSong } = usePlayerStore();
   const { playlists: userPlaylists } = useLibraryStore();
 
-  const playlist = [...mockPlaylists, ...userPlaylists].find((p) => p.id === id);
+  const [playlist, setPlaylist] = useState<Playlist | null>(null);
+
+  useEffect(() => {
+    if (!id) return;
+    const local = userPlaylists.find((p) => p.id === id);
+    if (local) {
+      setPlaylist(local);
+    } else if (id.startsWith("dz-p-")) {
+      fetchPlaylist(id).then((p) => setPlaylist(p));
+    } else {
+      setPlaylist(null);
+    }
+  }, [id, userPlaylists]);
 
   if (!playlist) {
     return <div className="px-6 py-20 text-center text-muted-foreground">Playlist not found</div>;

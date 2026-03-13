@@ -4,7 +4,6 @@ import { motion } from "framer-motion";
 import { Play, Shuffle, UserPlus } from "lucide-react";
 import MusicCard from "@/components/MusicCard";
 import { fetchArtistDetails } from "@/services/deezerApi";
-import { mockArtists, mockSongs } from "@/data/mockData";
 import { Artist } from "@/types/music";
 import { usePlayerStore } from "@/stores/playerStore";
 
@@ -18,16 +17,7 @@ export default function ArtistPage() {
     if (!id) return;
     setLoading(true);
     fetchArtistDetails(id).then((a) => {
-      if (a) {
-        setArtist(a);
-      } else {
-        // fallback
-        const mock = mockArtists.find(ar => ar.id === id);
-        if (mock) {
-          mock.topSongs = mockSongs.filter(s => s.artistId === id);
-          setArtist(mock);
-        }
-      }
+      setArtist(a);
       setLoading(false);
     });
   }, [id]);

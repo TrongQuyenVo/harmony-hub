@@ -1,14 +1,20 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Plus, ListMusic } from "lucide-react";
 import PlaylistCard from "@/components/PlaylistCard";
 import { useLibraryStore } from "@/stores/libraryStore";
-import { mockPlaylists } from "@/data/mockData";
+import { fetchTrendingPlaylists } from "@/services/deezerApi";
+import { Playlist } from "@/types/music";
 
 export default function PlaylistsPage() {
   const { playlists, createPlaylist } = useLibraryStore();
   const [showCreate, setShowCreate] = useState(false);
   const [newName, setNewName] = useState("");
+  const [featured, setFeatured] = useState<Playlist[]>([]);
+
+  useEffect(() => {
+    fetchTrendingPlaylists().then(setFeatured);
+  }, []);
 
   const handleCreate = () => {
     if (newName.trim()) {
@@ -72,7 +78,7 @@ export default function PlaylistsPage() {
         {/* Featured playlists */}
         <h2 className="text-xl font-bold text-foreground mb-4">Featured Playlists</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {mockPlaylists.map((pl, i) => (
+          {featured.map((pl, i) => (
             <PlaylistCard key={pl.id} playlist={pl} index={i} />
           ))}
         </div>

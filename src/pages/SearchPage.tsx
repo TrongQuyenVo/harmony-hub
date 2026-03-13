@@ -1,36 +1,51 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Search as SearchIcon } from "lucide-react";
 import MusicCard from "@/components/MusicCard";
 import ArtistCard from "@/components/ArtistCard";
-import { searchDeezer } from "@/services/deezerApi";
-import { mockSongs, mockArtists, genres } from "@/data/mockData";
-import { Song } from "@/types/music";
+import { searchDeezer, searchArtists, fetchTrendingSongs, fetchTrendingArtists } from "@/services/deezerApi";
+import { genres } from "@/data/genres";
+import { Artist, Song } from "@/types/music";
 
 export default function SearchPage() {
   const [params] = useSearchParams();
   const query = params.get("q") || "";
   const [results, setResults] = useState<Song[]>([]);
+  const [artistResults, setArtistResults] = useState<Artist[]>([]);
+  const [topSongs, setTopSongs] = useState<Song[]>([]);
+  const [topArtists, setTopArtists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (query) {
+    async function runSearch() {
       setLoading(true);
-      searchDeezer(query).then((songs) => {
+      if (query) {
+        const [songs, artists] = await Promise.all([
+          searchDeezer(query),
+          searchArtists(query),
+        ]);
         setResults(songs);
-        setLoading(false);
-      });
+        setArtistResults(artists);
+      } else {
+        // no query, load some trending content
+        const [songs, artists] = await Promise.all([
+          fetchTrendingSongs(),
+          fetchTrendingArtists(),
+        ]);
+        setTopSongs(songs);
+        setTopArtists(artists);
+      }
+      setLoading(false);
     }
+
+    runSearch();
   }, [query]);
 
-  const filteredArtists = query
-    ? mockArtists.filter((a) => a.name.toLowerCase().includes(query.toLowerCase()))
-    : [];
+  const filteredArtists = query ? artistResults : [];
 
   return (
     <div className="px-4 md:px-6 py-6 space-y-8">
-      {!query ? (
+      {query === "" ? (
         <>
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <h1 className="text-2xl font-bold text-foreground mb-6">Browse All</h1>
@@ -49,14 +64,27 @@ export default function SearchPage() {
             </div>
           </motion.div>
 
-          <section>
-            <h2 className="text-xl font-bold text-foreground mb-4">Recommended for You</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-              {mockSongs.slice(0, 6).map((song, i) => (
-                <MusicCard key={song.id} song={song} queue={mockSongs} index={i} />
-              ))}
-            </div>
-          </section>
+          {topSongs.length > 0 && (
+            <section>
+              <h2 className="text-xl font-bold text-foreground mb-4">Popular Songs</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {topSongs.slice(0, 6).map((song, i) => (
+                  <MusicCard key={song.id} song={song} queue={topSongs} index={i} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {topArtists.length > 0 && (
+            <section>
+              <h2 className="text-xl font-bold text-foreground mb-4">Popular Artists</h2>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {topArtists.map((a, i) => (
+                  <ArtistCard key={a.id} artist={a} index={i} />
+                ))}
+              </div>
+            </section>
+          )}
         </>
       ) : (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>

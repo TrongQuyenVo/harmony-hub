@@ -1,5 +1,4 @@
-import { Song, Artist } from "@/types/music";
-import { mockSongs, mockArtists, DEEZER_TRACK_IDS } from "@/data/mockData";
+import { Song, Artist, Playlist } from "@/types/music";
 
 const DEEZER_BASE = "https://api.deezer.com";
 
@@ -37,8 +36,8 @@ function fetchJsonp<T>(url: string): Promise<T> {
     const script = document.createElement("script");
     
     const cleanup = () => {
-      delete (window as any)[callbackName];
-      if (script.parentNode) script.parentNode.removeChild(script);
+      delete (globalThis as any)[callbackName];
+      script.remove();
     };
 
     const timeout = setTimeout(() => {
@@ -46,7 +45,7 @@ function fetchJsonp<T>(url: string): Promise<T> {
       reject(new Error("JSONP timeout"));
     }, 8000);
 
-    (window as any)[callbackName] = (data: T) => {
+    (globalThis as any)[callbackName] = (data: T) => {
       clearTimeout(timeout);
       cleanup();
       resolve(data);
@@ -69,14 +68,12 @@ export async function fetchTrendingSongs(): Promise<Song[]> {
       `${DEEZER_BASE}/chart/0/tracks?limit=20`
     );
     if (data.data && Array.isArray(data.data)) {
-      const songs = data.data.filter(t => t.preview).map(mapDeezerTrack);
-      if (songs.length > 0) return songs;
+      return data.data.filter(t => t.preview).map(mapDeezerTrack);
     }
   } catch (e) {
-    console.log("Deezer chart fetch failed, using mock data", e);
+    console.warn("Failed to load trending songs", e);
   }
-  // Fallback: try to fetch individual tracks to get preview URLs
-  return fetchTrackPreviews(mockSongs);
+  return [];
 }
 
 export async function searchDeezer(query: string): Promise<Song[]> {
@@ -85,17 +82,12 @@ export async function searchDeezer(query: string): Promise<Song[]> {
       `${DEEZER_BASE}/search?q=${encodeURIComponent(query)}&limit=20`
     );
     if (data.data && Array.isArray(data.data)) {
-      const songs = data.data.filter(t => t.preview).map(mapDeezerTrack);
-      if (songs.length > 0) return songs;
+      return data.data.filter(t => t.preview).map(mapDeezerTrack);
     }
   } catch (e) {
-    console.log("Deezer search failed, using mock filter", e);
+    console.warn("Deezer search failed", e);
   }
-  const q = query.toLowerCase();
-  return mockSongs.filter(s =>
-    s.title.toLowerCase().includes(q) ||
-    s.artist.toLowerCase().includes(q)
-  );
+  return [];
 }
 
 // Fetch a single track to get its fresh preview URL
@@ -112,32 +104,10 @@ export async function fetchTrackPreview(trackId: string): Promise<string> {
   return "";
 }
 
-// Batch fetch preview URLs for mock songs
-async function fetchTrackPreviews(songs: Song[]): Promise<Song[]> {
-  const results = await Promise.allSettled(
-    songs.map(async (song) => {
-      const numericId = song.id.replace("dz-", "");
-      try {
-        const data = await fetchJsonp<DeezerTrack>(
-          `${DEEZER_BASE}/track/${numericId}`
-        );
-        return { ...song, preview: data.preview || "" };
-      } catch {
-        return song;
-      }
-    })
-  );
 
-  return results.map((r, i) =>
-    r.status === "fulfilled" ? r.value : songs[i]
-  );
-}
 
 export async function fetchArtistDetails(artistId: string): Promise<Artist | null> {
-  const mockArtist = mockArtists.find(a => a.id === artistId);
-
   const dzId = artistId.replace("dz-a-", "");
-  
   try {
     const data = await fetchJsonp<any>(`${DEEZER_BASE}/artist/${dzId}`);
     const topData = await fetchJsonp<{ data: DeezerTrack[] }>(
@@ -146,17 +116,107 @@ export async function fetchArtistDetails(artistId: string): Promise<Artist | nul
 
     return {
       id: artistId,
-      name: data.name || mockArtist?.name || "Unknown",
-      image: data.picture_xl || data.picture_big || mockArtist?.image || "/placeholder.svg",
-      bio: data.nb_fan
-        ? `${data.name} has ${data.nb_fan.toLocaleString()} fans worldwide.`
-        : mockArtist?.bio || "",
-      followers: data.nb_fan || mockArtist?.followers || 0,
-      topSongs: topData.data?.filter((t: DeezerTrack) => t.preview).map(mapDeezerTrack) || mockArtist?.topSongs || [],
+      name: data.name || "Unknown",
+      image: data.picture_xl || data.picture_big || "/placeholder.svg",
+      bio: data.nb_fan ? `${data.name} has ${data.nb_fan.toLocaleString()} fans worldwide.` : "",
+      followers: data.nb_fan || 0,
+      topSongs: topData.data?.filter((t: DeezerTrack) => t.preview).map(mapDeezerTrack) || [],
       albums: [],
     };
   } catch {
-    if (mockArtist) return mockArtist;
+    return null;
+  }
+}
+
+
+// helpers for artist/playlist mapping
+function mapDeezerArtist(d: any): Artist {
+  return {
+    id: `dz-a-${d.id}`,
+    name: d.name,
+    image: d.picture_xl || d.picture_big || "/placeholder.svg",
+    bio: "",
+    followers: d.nb_fan || 0,
+    topSongs: [],
+    albums: [],
+  };
+}
+
+function mapDeezerPlaylist(p: any): Playlist {
+  return {
+    id: `dz-p-${p.id}`,
+    name: p.title,
+    description: p.description || "",
+    cover: p.picture_xl || p.picture_medium || "/placeholder.svg",
+    songs: [],
+    createdAt: "",
+    isPublic: true,
+  };
+}
+
+export async function fetchTrendingArtists(): Promise<Artist[]> {
+  try {
+    const data = await fetchJsonp<{ data: any[] }>(
+      `${DEEZER_BASE}/chart/0/artists?limit=20`
+    );
+    if (data.data && Array.isArray(data.data)) {
+      return data.data.map(mapDeezerArtist);
+    }
+  } catch (e) {
+    console.warn("Failed to load trending artists", e);
+  }
+  return [];
+}
+
+export async function fetchTrendingPlaylists(): Promise<Playlist[]> {
+  try {
+    const data = await fetchJsonp<{ data: any[] }>(
+      `${DEEZER_BASE}/chart/0/playlists?limit=20`
+    );
+    if (data.data && Array.isArray(data.data)) {
+      return data.data.map(mapDeezerPlaylist);
+    }
+  } catch (e) {
+    console.warn("Failed to load trending playlists", e);
+  }
+  return [];
+}
+
+export async function searchArtists(query: string): Promise<Artist[]> {
+  try {
+    const data = await fetchJsonp<{ data: any[] }>(
+      `${DEEZER_BASE}/search/artist?q=${encodeURIComponent(query)}&limit=20`
+    );
+    if (data.data && Array.isArray(data.data)) {
+      return data.data.map(mapDeezerArtist);
+    }
+  } catch (e) {
+    console.warn("Artist search failed", e);
+  }
+  return [];
+}
+
+export async function fetchPlaylist(id: string): Promise<Playlist | null> {
+  const dzId = id.replace("dz-p-", "");
+  try {
+    const data = await fetchJsonp<any>(`${DEEZER_BASE}/playlist/${dzId}`);
+    const songs: Song[] = [];
+    if (data.tracks && Array.isArray(data.tracks.data)) {
+      data.tracks.data.forEach((t: DeezerTrack) => {
+        if (t.preview) songs.push(mapDeezerTrack(t));
+      });
+    }
+    return {
+      id: `dz-p-${data.id}`,
+      name: data.title,
+      description: data.description || "",
+      cover: data.picture_xl || data.picture_medium || "/placeholder.svg",
+      songs,
+      createdAt: data.creation_date || "",
+      isPublic: true,
+    };
+  } catch (e) {
+    console.warn("Failed to fetch playlist", e);
     return null;
   }
 }
