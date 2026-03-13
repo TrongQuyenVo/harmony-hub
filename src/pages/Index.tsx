@@ -11,6 +11,8 @@ import { Song, Artist, Playlist } from "@/types/music";
 
 export default function HomePage() {
   const [trending, setTrending] = useState<Song[]>([]);
+  const [vietSongs, setVietSongs] = useState<Song[]>([]);
+  const [chineseSongs, setChineseSongs] = useState<Song[]>([]);
   const [artists, setArtists] = useState<Artist[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const { playSong } = usePlayerStore();
