@@ -1,23 +1,14 @@
 import { Song, Artist, Playlist } from "@/types/music";
-import { supabase } from "@/integrations/supabase/client";
+
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 async function musicFetch<T>(path: string): Promise<T> {
-  const { data, error } = await supabase.functions.invoke("music-api", {
-    body: null,
-    method: "GET",
-    // We'll construct the URL manually since invoke doesn't support query params well
-  });
-
-  // Use direct fetch with the project URL for GET requests with paths
-  const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-  const url = `${supabaseUrl}/functions/v1/music-api${path}`;
+  const url = `${SUPABASE_URL}/functions/v1/music-api${path}`;
   const res = await fetch(url, {
     headers: {
-      "Authorization": `Bearer ${anonKey}`,
-      "apikey": anonKey,
+      "Authorization": `Bearer ${ANON_KEY}`,
+      "apikey": ANON_KEY,
     },
   });
 
