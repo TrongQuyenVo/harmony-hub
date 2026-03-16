@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Play, Shuffle, UserPlus } from "lucide-react";
 import MusicCard from "@/components/MusicCard";
-import { fetchArtistDetails } from "@/services/deezerApi";
+import { fetchArtistDetails } from "@/services/musicApi";
 import { Artist } from "@/types/music";
 import { usePlayerStore } from "@/stores/playerStore";
 

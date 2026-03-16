@@ -5,7 +5,7 @@ import MusicCard from "@/components/MusicCard";
 import ArtistCard from "@/components/ArtistCard";
 import PlaylistCard from "@/components/PlaylistCard";
 import { usePlayerStore } from "@/stores/playerStore";
-import { fetchTrendingSongs, fetchTrendingArtists, fetchTrendingPlaylists, fetchVietnameseChart, fetchChineseChart } from "@/services/deezerApi";
+import { fetchTrendingSongs, fetchTrendingArtists, fetchTrendingPlaylists, fetchVietnameseChart, fetchChineseChart } from "@/services/musicApi";
 import { genres } from "@/data/genres";
 import { Song, Artist, Playlist } from "@/types/music";
 

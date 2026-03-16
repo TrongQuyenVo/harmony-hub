@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { TrendingUp } from "lucide-react";
 import MusicCard from "@/components/MusicCard";
-import { fetchTrendingSongs, fetchVietnameseChart, fetchChineseChart } from "@/services/deezerApi";
+import { fetchTrendingSongs, fetchVietnameseChart, fetchChineseChart } from "@/services/musicApi";
 import { Song } from "@/types/music";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 

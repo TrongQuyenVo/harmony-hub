@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import ArtistCard from "@/components/ArtistCard";
-import { fetchTrendingArtists } from "@/services/deezerApi";
+import { fetchTrendingArtists } from "@/services/musicApi";
 import { Artist } from "@/types/music";
 
 export default function ArtistsPage() {

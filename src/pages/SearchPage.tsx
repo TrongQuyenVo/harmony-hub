@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import MusicCard from "@/components/MusicCard";
 import ArtistCard from "@/components/ArtistCard";
-import { searchDeezer, searchArtists, fetchTrendingSongs, fetchTrendingArtists } from "@/services/deezerApi";
+import { searchSongs, searchArtists, fetchTrendingSongs, fetchTrendingArtists } from "@/services/musicApi";
 import { genres } from "@/data/genres";
 import { Artist, Song } from "@/types/music";
 
@@ -21,13 +21,12 @@ export default function SearchPage() {
       setLoading(true);
       if (query) {
         const [songs, artists] = await Promise.all([
-          searchDeezer(query),
+          searchSongs(query),
           searchArtists(query),
         ]);
         setResults(songs);
         setArtistResults(artists);
       } else {
-        // no query, load some trending content
         const [songs, artists] = await Promise.all([
           fetchTrendingSongs(),
           fetchTrendingArtists(),

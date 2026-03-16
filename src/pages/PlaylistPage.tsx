@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Play, Clock, Music } from "lucide-react";
 import MusicCard from "@/components/MusicCard";
-import { fetchPlaylist } from "@/services/deezerApi";
+import { fetchPlaylist } from "@/services/musicApi";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useLibraryStore } from "@/stores/libraryStore";
 import { Playlist } from "@/types/music";
@@ -20,10 +20,8 @@ export default function PlaylistPage() {
     const local = userPlaylists.find((p) => p.id === id);
     if (local) {
       setPlaylist(local);
-    } else if (id.startsWith("dz-p-")) {
-      fetchPlaylist(id).then((p) => setPlaylist(p));
     } else {
-      setPlaylist(null);
+      fetchPlaylist(id).then((p) => setPlaylist(p));
     }
   }, [id, userPlaylists]);
 
