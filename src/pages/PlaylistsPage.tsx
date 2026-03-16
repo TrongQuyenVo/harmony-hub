@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { Plus, ListMusic } from "lucide-react";
 import PlaylistCard from "@/components/PlaylistCard";
 import { useLibraryStore } from "@/stores/libraryStore";
-import { fetchTrendingPlaylists } from "@/services/deezerApi";
+import { fetchTrendingPlaylists } from "@/services/musicApi";
 import { Playlist } from "@/types/music";
 
 export default function PlaylistsPage() {
