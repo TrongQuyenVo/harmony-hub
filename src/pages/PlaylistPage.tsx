@@ -20,10 +20,8 @@ export default function PlaylistPage() {
     const local = userPlaylists.find((p) => p.id === id);
     if (local) {
       setPlaylist(local);
-    } else if (id.startsWith("dz-p-")) {
-      fetchPlaylist(id).then((p) => setPlaylist(p));
     } else {
-      setPlaylist(null);
+      fetchPlaylist(id).then((p) => setPlaylist(p));
     }
   }, [id, userPlaylists]);
 
