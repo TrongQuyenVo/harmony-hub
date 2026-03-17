@@ -130,10 +130,11 @@ async function searchArtists(query: string) {
     .map((item: any) => ({
       id: item.authorId || "",
       name: item.author || "Unknown",
-      image:
+      image: fixThumbnailUrl(
         item.authorThumbnails?.find((t: any) => t.width >= 100)?.url ||
         item.authorThumbnails?.[0]?.url ||
-        "/placeholder.svg",
+        "/placeholder.svg"
+      ),
       bio: item.description || "",
       followers: item.subCount || 0,
       topSongs: [],
