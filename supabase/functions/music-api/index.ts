@@ -158,9 +158,10 @@ async function getSongDetails(videoId: string) {
     artistId: data.authorId || "",
     album: "",
     albumId: "",
-    cover:
+    cover: fixThumbnailUrl(
       data.videoThumbnails?.find((t: any) => t.quality === "medium")?.url ||
-      `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+      `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+    ),
     preview: "",
     duration: data.lengthSeconds || 0,
     plays: data.viewCount || 0,
