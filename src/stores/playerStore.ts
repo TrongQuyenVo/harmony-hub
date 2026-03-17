@@ -40,11 +40,12 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   showLyrics: false,
 
   playSong: (song, queue) => {
-    const newQueue = queue || get().queue;
-    const index = newQueue.findIndex((s) => s.id === song.id);
+    const existingQueue = get().queue;
+    const nextQueue = queue && queue.length > 0 ? queue : existingQueue.length > 0 ? existingQueue : [song];
+    const index = nextQueue.findIndex((s) => s.id === song.id);
     set({
       currentSong: song,
-      queue: queue || get().queue.length === 0 ? (queue || [song]) : get().queue,
+      queue: nextQueue,
       queueIndex: index >= 0 ? index : 0,
       isPlaying: true,
       progress: 0,

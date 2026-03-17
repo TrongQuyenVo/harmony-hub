@@ -42,12 +42,16 @@ export default function MusicPlayer() {
       if (loading) setLoading(false);
     },
     onError: () => {
-      setLoading(false);
-      setPlaying(false);
+      if (!currentSong) {
+        setLoading(false);
+        setPlaying(false);
+        return;
+      }
+      const query = `${currentSong.title} ${currentSong.artist} official audio`;
+      ytPlayer.searchAndPlay(query);
     },
   });
 
-  // Load video when song changes
   useEffect(() => {
     if (!currentSong) return;
     if (lastSongIdRef.current === currentSong.id) {
@@ -58,14 +62,12 @@ export default function MusicPlayer() {
 
     lastSongIdRef.current = currentSong.id;
     setLoading(true);
+    setProgress(0);
+    setDuration(currentSong.duration || 0);
     addToRecentlyPlayed(currentSong);
-
-    // Search YouTube directly using the built-in search
-    const query = `${currentSong.title} ${currentSong.artist} official`;
-    ytPlayer.searchAndPlay(query);
+    ytPlayer.loadVideo(currentSong.id);
   }, [currentSong?.id]);
 
-  // Handle play/pause toggle
   useEffect(() => {
     if (!currentSong || loading) return;
     if (lastSongIdRef.current !== currentSong.id) return;
@@ -73,7 +75,6 @@ export default function MusicPlayer() {
     else ytPlayer.pause();
   }, [isPlaying]);
 
-  // Volume sync
   useEffect(() => {
     ytPlayer.setVolume(volume);
   }, [volume]);
@@ -94,9 +95,7 @@ export default function MusicPlayer() {
 
   const liked = currentSong ? isLiked(currentSong.id) : false;
 
-  if (!currentSong) return (
-    <div id={ytPlayer.containerId} className="hidden" />
-  );
+  if (!currentSong) return <div id={ytPlayer.containerId} className="hidden" />;
   const progressPct = duration > 0 ? (progress / duration) * 100 : 0;
 
   return (
@@ -109,7 +108,6 @@ export default function MusicPlayer() {
         className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-border"
       >
         <div className="flex items-center h-[72px] md:h-20 px-3 md:px-4">
-          {/* Song info */}
           <div className="flex items-center gap-3 w-[30%] min-w-0">
             <div className="w-12 h-12 md:w-14 md:h-14 rounded-lg overflow-hidden flex-shrink-0 shadow-card">
               <img
@@ -128,7 +126,6 @@ export default function MusicPlayer() {
             </button>
           </div>
 
-          {/* Controls */}
           <div className="flex flex-col items-center flex-1 max-w-[600px]">
             <div className="flex items-center gap-2 md:gap-4">
               <button onClick={toggleShuffle} className={cn("hidden sm:block p-1.5", shuffle ? "text-primary" : "text-muted-foreground hover:text-foreground")}>
@@ -163,7 +160,6 @@ export default function MusicPlayer() {
             </div>
           </div>
 
-          {/* Volume & extras */}
           <div className="hidden md:flex items-center gap-2 w-[30%] justify-end">
             <button onClick={toggleLyrics} className="p-1.5 text-muted-foreground hover:text-foreground transition-colors">
               <Mic2 className="w-4 h-4" />
