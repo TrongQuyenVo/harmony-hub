@@ -22,9 +22,10 @@ async function invFetch(path: string): Promise<any> {
   const errors: string[] = [];
 
   for (const instance of INVIDIOUS_INSTANCES) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
       const url = `${instance}/api/v1${path}`;
       console.log(`Trying: ${url}`);
 
@@ -35,20 +36,31 @@ async function invFetch(path: string): Promise<any> {
         },
         signal: controller.signal,
       });
-      clearTimeout(timeout);
 
       if (res.ok) {
         return await res.json();
       }
+
       const body = await res.text();
       errors.push(`${instance}: ${res.status} - ${body.substring(0, 100)}`);
     } catch (e) {
-      errors.push(`${instance}: ${e.message || e}`);
-      continue;
+      errors.push(`${instance}: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      clearTimeout(timeout);
     }
   }
+
   console.error("All instances failed:", JSON.stringify(errors));
-  throw new Error("All API instances failed");
+  throw new Error("All upstream music sources failed");
+}
+
+async function safeResolve<T>(loader: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await loader();
+  } catch (error) {
+    console.error("Music API fallback:", error);
+    return fallback;
+  }
 }
 
 function fixThumbnailUrl(url: string): string {
