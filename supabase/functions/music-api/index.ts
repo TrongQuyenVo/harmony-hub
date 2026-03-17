@@ -51,7 +51,19 @@ async function invFetch(path: string): Promise<any> {
   throw new Error("All API instances failed");
 }
 
+function fixThumbnailUrl(url: string): string {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  // Invidious returns relative paths like /vi/xxx/mqdefault.jpg
+  return `https://i.ytimg.com${url}`;
+}
+
 function mapInvidiousVideo(item: any) {
+  const thumbUrl =
+    item.videoThumbnails?.find((t: any) => t.quality === "medium")?.url ||
+    item.videoThumbnails?.[0]?.url ||
+    `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`;
+
   return {
     id: item.videoId || "",
     title: item.title || "Unknown",
@@ -59,10 +71,7 @@ function mapInvidiousVideo(item: any) {
     artistId: item.authorId || "",
     album: "",
     albumId: "",
-    cover:
-      item.videoThumbnails?.find((t: any) => t.quality === "medium")?.url ||
-      item.videoThumbnails?.[0]?.url ||
-      `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`,
+    cover: fixThumbnailUrl(thumbUrl),
     preview: "",
     duration: item.lengthSeconds || 0,
     plays: item.viewCount || 0,
