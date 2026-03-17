@@ -217,9 +217,10 @@ async function getTrendingArtists() {
     .map((item: any) => ({
       id: item.authorId || "",
       name: item.author || "Unknown",
-      image:
+      image: fixThumbnailUrl(
         item.authorThumbnails?.find((t: any) => t.width >= 100)?.url ||
-        "/placeholder.svg",
+        "/placeholder.svg"
+      ),
       bio: "",
       followers: item.subCount || 0,
       topSongs: [],
