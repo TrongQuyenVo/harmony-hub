@@ -51,29 +51,36 @@ async function getWorkingInstances(): Promise<string[]> {
 
 async function pipedFetch(path: string): Promise<any> {
   const instances = await getWorkingInstances();
+  const errors: string[] = [];
 
   for (const instance of instances) {
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const url = `${instance}${path}`;
+      console.log(`Trying: ${url}`);
 
-      const res = await fetch(`${instance}${path}`, {
-        headers: { "User-Agent": "MusicApp/1.0" },
+      const res = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
         signal: controller.signal,
       });
       clearTimeout(timeout);
+
+      console.log(`Response from ${instance}: ${res.status}`);
 
       if (res.ok) {
         const data = await res.json();
         return data;
       }
-      // Consume body to prevent leak
-      await res.text();
-    } catch {
+      const body = await res.text();
+      errors.push(`${instance}: ${res.status} - ${body.substring(0, 100)}`);
+    } catch (e) {
+      errors.push(`${instance}: ${e.message || e}`);
       continue;
     }
   }
-  throw new Error("All Piped instances failed");
+  console.error("All instances failed:", JSON.stringify(errors));
+  throw new Error("All Piped instances failed: " + errors.join("; "));
 }
 
 function extractVideoId(url: string): string {
