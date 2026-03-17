@@ -20,9 +20,41 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions) {
   const containerIdRef = useRef(`yt-player-${Date.now()}`);
   const intervalRef = useRef<number>();
   const optionsRef = useRef(options);
-  optionsRef.current = options;
   const readyRef = useRef(false);
+  const pendingVideoIdRef = useRef<string | null>(null);
   const pendingSearchRef = useRef<string | null>(null);
+  optionsRef.current = options;
+
+  const playVideoId = useCallback((videoId: string) => {
+    if (!readyRef.current || !playerRef.current) {
+      pendingVideoIdRef.current = videoId;
+      return;
+    }
+
+    try {
+      playerRef.current.loadVideoById({ videoId, startSeconds: 0 });
+    } catch (e) {
+      console.warn("YouTube loadVideoById failed:", e);
+      optionsRef.current.onError?.();
+    }
+  }, []);
+
+  const searchAndPlay = useCallback((query: string) => {
+    if (!readyRef.current || !playerRef.current) {
+      pendingSearchRef.current = query;
+      return;
+    }
+
+    try {
+      playerRef.current.loadPlaylist({
+        listType: "search",
+        list: query,
+      });
+    } catch (e) {
+      console.warn("YouTube search failed:", e);
+      optionsRef.current.onError?.();
+    }
+  }, []);
 
   const createPlayer = useCallback(async () => {
     await loadYouTubeAPI();
@@ -47,9 +79,16 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions) {
       events: {
         onReady: () => {
           readyRef.current = true;
+          if (pendingVideoIdRef.current) {
+            const videoId = pendingVideoIdRef.current;
+            pendingVideoIdRef.current = null;
+            playVideoId(videoId);
+            return;
+          }
           if (pendingSearchRef.current) {
-            searchAndPlay(pendingSearchRef.current);
+            const query = pendingSearchRef.current;
             pendingSearchRef.current = null;
+            searchAndPlay(query);
           }
         },
         onStateChange: (event: any) => {
@@ -77,25 +116,7 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions) {
         },
       },
     });
-  }, []);
-
-  // Use YouTube's built-in search via loadPlaylist
-  const searchAndPlay = useCallback((query: string) => {
-    if (!readyRef.current || !playerRef.current) {
-      pendingSearchRef.current = query;
-      return;
-    }
-    try {
-      // Use cuePlaylist with listType 'search' to find and play
-      playerRef.current.loadPlaylist({
-        listType: "search",
-        list: query,
-      });
-    } catch (e) {
-      console.warn("YouTube search failed:", e);
-      optionsRef.current.onError?.();
-    }
-  }, []);
+  }, [playVideoId, searchAndPlay]);
 
   const play = useCallback(() => {
     playerRef.current?.playVideo?.();
@@ -125,6 +146,7 @@ export function useYouTubePlayer(options: UseYouTubePlayerOptions) {
 
   return {
     containerId: containerIdRef.current,
+    loadVideo: playVideoId,
     searchAndPlay,
     play,
     pause,
