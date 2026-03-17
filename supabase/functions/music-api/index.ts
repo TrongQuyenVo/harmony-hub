@@ -3,164 +3,204 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Multiple Piped instances for fallback
-const PIPED_INSTANCES = [
-  "https://pipedapi.kavin.rocks",
-  "https://pipedapi.adminforge.de",
-  "https://pipedapi.in.projectsegfau.lt",
+// Invidious instances (more server-friendly than Piped)
+const INVIDIOUS_INSTANCES = [
+  "https://invidious.darkness.services",
+  "https://inv.nadeko.net",
+  "https://invidious.nerdvpn.de",
+  "https://invidious.jing.rocks",
+  "https://invidious.privacyredirect.com",
+  "https://inv.tux.pizza",
+  "https://invidious.protokoll-11.de",
+  "https://iv.datura.network",
 ];
 
-async function pipedFetch(path: string): Promise<any> {
-  for (const instance of PIPED_INSTANCES) {
+async function invFetch(path: string): Promise<any> {
+  const errors: string[] = [];
+
+  for (const instance of INVIDIOUS_INSTANCES) {
     try {
-      const res = await fetch(`${instance}${path}`, {
-        headers: { "User-Agent": "MusicApp/1.0" },
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 10000);
+      const url = `${instance}/api/v1${path}`;
+      console.log(`Trying: ${url}`);
+
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
+
       if (res.ok) {
         return await res.json();
       }
-    } catch {
+      const body = await res.text();
+      errors.push(`${instance}: ${res.status} - ${body.substring(0, 100)}`);
+    } catch (e) {
+      errors.push(`${instance}: ${e.message || e}`);
       continue;
     }
   }
-  throw new Error("All Piped instances failed");
+  console.error("All instances failed:", JSON.stringify(errors));
+  throw new Error("All API instances failed");
 }
 
-function extractVideoId(url: string): string {
-  // Piped returns /watch?v=VIDEO_ID
-  const match = url?.match(/[?&]v=([^&]+)/);
-  return match ? match[1] : url?.replace("/watch?v=", "") || "";
+function fixThumbnailUrl(url: string): string {
+  if (!url) return "";
+  if (url.startsWith("http")) return url;
+  // Invidious returns relative paths like /vi/xxx/mqdefault.jpg
+  return `https://i.ytimg.com${url}`;
 }
 
-function mapPipedItem(item: any) {
-  const videoId = extractVideoId(item.url || "");
+function mapInvidiousVideo(item: any) {
+  const thumbUrl =
+    item.videoThumbnails?.find((t: any) => t.quality === "medium")?.url ||
+    item.videoThumbnails?.[0]?.url ||
+    `https://i.ytimg.com/vi/${item.videoId}/hqdefault.jpg`;
+
   return {
-    id: videoId,
+    id: item.videoId || "",
     title: item.title || "Unknown",
-    artist: item.uploaderName?.replace(" - Topic", "") || item.uploaderName || "Unknown",
-    artistId: item.uploaderUrl?.replace("/channel/", "") || "",
+    artist: item.author?.replace(" - Topic", "") || item.author || "Unknown",
+    artistId: item.authorId || "",
     album: "",
     albumId: "",
-    cover:
-      item.thumbnail ||
-      `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
-    preview: "", // playback via YouTube IFrame
-    duration: item.duration || 0,
-    plays: item.views || 0,
+    cover: fixThumbnailUrl(thumbUrl),
+    preview: "",
+    duration: item.lengthSeconds || 0,
+    plays: item.viewCount || 0,
   };
 }
 
-// Curated trending playlists (YouTube Music official playlists)
-const TRENDING_PLAYLISTS: Record<string, { query: string }> = {
-  global: { query: "top hits 2025 popular music" },
-  viet: { query: "nhạc việt nam hot trending 2025" },
-  chinese: { query: "华语流行 热门歌曲 2025" },
+const TRENDING_QUERIES: Record<string, string> = {
+  global: "top hits 2025 popular songs",
+  viet: "nhạc việt nam hot trending 2025",
+  chinese: "华语流行 热门歌曲 2025",
 };
 
 async function getTrending(region = "global") {
-  const config = TRENDING_PLAYLISTS[region] || TRENDING_PLAYLISTS.global;
-  // Use search with music_songs filter for better results
-  const data = await pipedFetch(
-    `/search?q=${encodeURIComponent(config.query)}&filter=music_songs`
+  // Try /trending endpoint first for global
+  if (region === "global") {
+    try {
+      const data = await invFetch("/trending?type=music&region=US");
+      if (Array.isArray(data) && data.length > 0) {
+        return data
+          .filter((v: any) => v.lengthSeconds > 0 && v.lengthSeconds < 600)
+          .slice(0, 30)
+          .map(mapInvidiousVideo);
+      }
+    } catch {
+      // Fall through to search
+    }
+  }
+
+  const query = TRENDING_QUERIES[region] || TRENDING_QUERIES.global;
+  const data = await invFetch(
+    `/search?q=${encodeURIComponent(query)}&type=video&sort=views&date=month`
   );
-  const items = data.items || [];
-  return items
-    .filter((item: any) => item.url && item.duration > 0 && item.duration < 600)
-    .map(mapPipedItem);
+  return (data || [])
+    .filter((v: any) => v.type === "video" && v.lengthSeconds > 0 && v.lengthSeconds < 600)
+    .slice(0, 30)
+    .map(mapInvidiousVideo);
 }
 
 async function searchSongs(query: string) {
-  const data = await pipedFetch(
-    `/search?q=${encodeURIComponent(query)}&filter=music_songs`
+  const data = await invFetch(
+    `/search?q=${encodeURIComponent(query)}&type=video&sort=relevance`
   );
-  const items = data.items || [];
-  return items
-    .filter((item: any) => item.url && item.duration > 0)
-    .map(mapPipedItem);
+  return (data || [])
+    .filter((v: any) => v.type === "video" && v.lengthSeconds > 0)
+    .slice(0, 30)
+    .map(mapInvidiousVideo);
 }
 
 async function searchArtists(query: string) {
-  const data = await pipedFetch(
-    `/search?q=${encodeURIComponent(query)}&filter=music_artists`
+  const data = await invFetch(
+    `/search?q=${encodeURIComponent(query)}&type=channel`
   );
-  const items = data.items || [];
-  // Fallback: also try channels filter
-  if (items.length === 0) {
-    const data2 = await pipedFetch(
-      `/search?q=${encodeURIComponent(query)}&filter=channels`
-    );
-    return (data2.items || []).map((item: any) => ({
-      id: item.url?.replace("/channel/", "") || "",
-      name: item.name || "Unknown",
-      image: item.thumbnail || "/placeholder.svg",
+  return (data || [])
+    .filter((v: any) => v.type === "channel")
+    .slice(0, 20)
+    .map((item: any) => ({
+      id: item.authorId || "",
+      name: item.author || "Unknown",
+      image: fixThumbnailUrl(
+        item.authorThumbnails?.find((t: any) => t.width >= 100)?.url ||
+        item.authorThumbnails?.[0]?.url ||
+        "/placeholder.svg"
+      ),
       bio: item.description || "",
-      followers: item.subscribers || 0,
+      followers: item.subCount || 0,
       topSongs: [],
       albums: [],
     }));
-  }
-  return items.map((item: any) => ({
-    id: item.url?.replace("/channel/", "") || "",
-    name: item.name || "Unknown",
-    image: item.thumbnail || "/placeholder.svg",
-    bio: item.description || "",
-    followers: item.subscribers || 0,
-    topSongs: [],
-    albums: [],
-  }));
 }
 
 async function getSongDetails(videoId: string) {
-  const data = await pipedFetch(`/streams/${videoId}`);
+  const data = await invFetch(`/videos/${videoId}`);
+
+  // Get best audio stream
+  const audioStream = (data.adaptiveFormats || [])
+    .filter((f: any) => f.type?.startsWith("audio/"))
+    .sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+
   return {
     id: videoId,
     title: data.title || "Unknown",
-    artist: data.uploader?.replace(" - Topic", "") || data.uploader || "Unknown",
-    artistId: data.uploaderUrl?.replace("/channel/", "") || "",
+    artist:
+      data.author?.replace(" - Topic", "") || data.author || "Unknown",
+    artistId: data.authorId || "",
     album: "",
     albumId: "",
-    cover: data.thumbnailUrl || `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`,
+    cover: fixThumbnailUrl(
+      data.videoThumbnails?.find((t: any) => t.quality === "medium")?.url ||
+      `https://i.ytimg.com/vi/${videoId}/hqdefault.jpg`
+    ),
     preview: "",
-    duration: data.duration || 0,
-    plays: data.views || 0,
-    // Include audio stream URL for direct playback
-    streamUrl: data.audioStreams?.sort((a: any, b: any) => (b.bitrate || 0) - (a.bitrate || 0))?.[0]?.url || "",
+    duration: data.lengthSeconds || 0,
+    plays: data.viewCount || 0,
+    streamUrl: audioStream?.url || "",
   };
 }
 
 async function getArtistDetails(channelId: string) {
-  const data = await pipedFetch(`/channel/${channelId}`);
-  // Get top videos as songs
-  const videos = (data.relatedStreams || [])
-    .filter((v: any) => v.duration > 0 && v.duration < 600)
+  const data = await invFetch(`/channels/${channelId}`);
+  const videos = (data.latestVideos || [])
+    .filter((v: any) => v.lengthSeconds > 0 && v.lengthSeconds < 600)
     .slice(0, 15)
-    .map(mapPipedItem);
+    .map(mapInvidiousVideo);
 
   return {
     id: channelId,
-    name: data.name?.replace(" - Topic", "") || data.name || "Unknown",
-    image: data.avatarUrl || "/placeholder.svg",
+    name: data.author?.replace(" - Topic", "") || data.author || "Unknown",
+    image: fixThumbnailUrl(
+      data.authorThumbnails?.find((t: any) => t.width >= 100)?.url ||
+      "/placeholder.svg"
+    ),
     bio: data.description || "",
-    followers: data.subscriberCount || 0,
+    followers: data.subCount || 0,
     topSongs: videos,
     albums: [],
   };
 }
 
 async function getPlaylistDetails(playlistId: string) {
-  const data = await pipedFetch(`/playlists/${playlistId}`);
-  const songs = (data.relatedStreams || [])
-    .filter((v: any) => v.duration > 0)
-    .map(mapPipedItem);
+  const data = await invFetch(`/playlists/${playlistId}`);
+  const songs = (data.videos || [])
+    .filter((v: any) => v.lengthSeconds > 0)
+    .map(mapInvidiousVideo);
 
   return {
     id: playlistId,
-    name: data.name || "Playlist",
-    description: "",
-    cover: data.thumbnailUrl || songs[0]?.cover || "/placeholder.svg",
+    name: data.title || "Playlist",
+    description: data.description || "",
+    cover: songs[0]?.cover || "/placeholder.svg",
     songs,
     createdAt: "",
     isPublic: true,
@@ -168,37 +208,45 @@ async function getPlaylistDetails(playlistId: string) {
 }
 
 async function getTrendingArtists() {
-  // Search for popular artists
-  const data = await pipedFetch(
-    `/search?q=${encodeURIComponent("popular music artists 2025")}&filter=channels`
+  const data = await invFetch(
+    `/search?q=${encodeURIComponent("popular music artists 2025")}&type=channel`
   );
-  return (data.items || [])
-    .filter((item: any) => item.name && item.subscribers > 0)
+  return (data || [])
+    .filter((item: any) => item.type === "channel" && item.author)
     .slice(0, 20)
     .map((item: any) => ({
-      id: item.url?.replace("/channel/", "") || "",
-      name: item.name || "Unknown",
-      image: item.thumbnail || "/placeholder.svg",
+      id: item.authorId || "",
+      name: item.author || "Unknown",
+      image: fixThumbnailUrl(
+        item.authorThumbnails?.find((t: any) => t.width >= 100)?.url ||
+        "/placeholder.svg"
+      ),
       bio: "",
-      followers: item.subscribers || 0,
+      followers: item.subCount || 0,
       topSongs: [],
       albums: [],
     }));
 }
 
 async function getTrendingPlaylists() {
-  const data = await pipedFetch(
-    `/search?q=${encodeURIComponent("top hits 2025 playlist")}&filter=playlists`
+  const data = await invFetch(
+    `/search?q=${encodeURIComponent("top hits 2025 playlist")}&type=playlist`
   );
-  return (data.items || []).slice(0, 20).map((item: any) => ({
-    id: item.url?.replace("/playlist?list=", "") || "",
-    name: item.name || "Playlist",
-    description: "",
-    cover: item.thumbnail || "/placeholder.svg",
-    songs: [],
-    createdAt: "",
-    isPublic: true,
-  }));
+  return (data || [])
+    .filter((item: any) => item.type === "playlist")
+    .slice(0, 20)
+    .map((item: any) => ({
+      id: item.playlistId || "",
+      name: item.title || "Playlist",
+      description: "",
+      cover:
+        item.playlistThumbnail ||
+        item.videos?.[0]?.videoThumbnails?.[0]?.url ||
+        "/placeholder.svg",
+      songs: [],
+      createdAt: "",
+      isPublic: true,
+    }));
 }
 
 serve(async (req) => {
