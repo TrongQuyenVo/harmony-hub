@@ -179,9 +179,10 @@ async function getArtistDetails(channelId: string) {
   return {
     id: channelId,
     name: data.author?.replace(" - Topic", "") || data.author || "Unknown",
-    image:
+    image: fixThumbnailUrl(
       data.authorThumbnails?.find((t: any) => t.width >= 100)?.url ||
-      "/placeholder.svg",
+      "/placeholder.svg"
+    ),
     bio: data.description || "",
     followers: data.subCount || 0,
     topSongs: videos,
