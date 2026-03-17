@@ -274,28 +274,30 @@ serve(async (req) => {
 
     if (path === "/trending" || path === "/trending/") {
       const region = url.searchParams.get("region") || "global";
-      result = await getTrending(region);
+      result = await safeResolve(() => getTrending(region), []);
     } else if (path === "/trending-artists") {
-      result = await getTrendingArtists();
+      result = await safeResolve(() => getTrendingArtists(), []);
     } else if (path === "/trending-playlists") {
-      result = await getTrendingPlaylists();
+      result = await safeResolve(() => getTrendingPlaylists(), []);
     } else if (path === "/search") {
       const q = url.searchParams.get("q") || "";
       const type = url.searchParams.get("type") || "songs";
-      if (type === "artists") {
-        result = await searchArtists(q);
+      if (!q.trim()) {
+        result = [];
+      } else if (type === "artists") {
+        result = await safeResolve(() => searchArtists(q), []);
       } else {
-        result = await searchSongs(q);
+        result = await safeResolve(() => searchSongs(q), []);
       }
     } else if (path.startsWith("/song/")) {
       const id = path.replace("/song/", "");
-      result = await getSongDetails(id);
+      result = await safeResolve(() => getSongDetails(id), null);
     } else if (path.startsWith("/artist/")) {
       const id = path.replace("/artist/", "");
-      result = await getArtistDetails(id);
+      result = await safeResolve(() => getArtistDetails(id), null);
     } else if (path.startsWith("/playlist/")) {
       const id = path.replace("/playlist/", "");
-      result = await getPlaylistDetails(id);
+      result = await safeResolve(() => getPlaylistDetails(id), null);
     } else {
       return new Response(JSON.stringify({ error: "Not found" }), {
         status: 404,
