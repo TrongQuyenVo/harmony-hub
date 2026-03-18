@@ -1,5 +1,6 @@
-import { Play, Heart, MoreHorizontal } from "lucide-react";
+import { Play, Heart } from "lucide-react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Song } from "@/types/music";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useLibraryStore } from "@/stores/libraryStore";
@@ -15,10 +16,19 @@ interface MusicCardProps {
 export default function MusicCard({ song, queue, index, variant = "card" }: MusicCardProps) {
   const { playSong, currentSong, isPlaying } = usePlayerStore();
   const { toggleLike, isLiked } = useLibraryStore();
+  const navigate = useNavigate();
   const active = currentSong?.id === song.id;
   const liked = isLiked(song.id);
 
-  const handlePlay = () => playSong(song, queue);
+  const handlePlay = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    playSong(song, queue);
+  };
+
+  const handleNavigate = () => {
+    playSong(song, queue);
+    navigate(`/song/${song.id}`);
+  };
 
   if (variant === "row") {
     return (
@@ -30,12 +40,12 @@ export default function MusicCard({ song, queue, index, variant = "card" }: Musi
           "flex items-center gap-3 px-3 py-2.5 rounded-lg group cursor-pointer transition-colors",
           active ? "bg-primary/10" : "hover:bg-muted/50"
         )}
-        onClick={handlePlay}
+        onClick={handleNavigate}
       >
         <span className="w-6 text-center text-sm text-muted-foreground group-hover:hidden">
           {(index || 0) + 1}
         </span>
-        <Play className="w-4 h-4 text-foreground hidden group-hover:block ml-1" />
+        <Play className="w-4 h-4 text-foreground hidden group-hover:block ml-1" onClick={handlePlay} />
 
         <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0">
           <img src={song.cover} alt={song.title} className="w-full h-full object-cover" onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }} />
@@ -70,17 +80,17 @@ export default function MusicCard({ song, queue, index, variant = "card" }: Musi
       transition={{ delay: (index || 0) * 0.05 }}
       whileHover={{ y: -4 }}
       className="group cursor-pointer"
-      onClick={handlePlay}
+      onClick={handleNavigate}
     >
       <div className="relative rounded-xl overflow-hidden shadow-card mb-3">
-        <img
-          src={song.cover}
-          alt={song.title}
-          className="w-full aspect-square object-cover"
+        <img src={song.cover} alt={song.title} className="w-full aspect-square object-cover"
           onError={(e) => { (e.target as HTMLImageElement).src = "/placeholder.svg"; }}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-        <button className="absolute bottom-3 right-3 w-10 h-10 rounded-full gradient-primary flex items-center justify-center shadow-glow opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300">
+        <button
+          onClick={handlePlay}
+          className="absolute bottom-3 right-3 w-10 h-10 rounded-full gradient-primary flex items-center justify-center shadow-glow opacity-0 group-hover:opacity-100 translate-y-2 group-hover:translate-y-0 transition-all duration-300"
+        >
           {active && isPlaying ? (
             <div className="flex gap-0.5 items-end h-3">
               <span className="w-0.5 bg-primary-foreground animate-pulse h-full" />
