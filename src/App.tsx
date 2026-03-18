@@ -12,9 +12,18 @@ import PlaylistsPage from "@/pages/PlaylistsPage";
 import PlaylistPage from "@/pages/PlaylistPage";
 import LikedSongsPage from "@/pages/LikedSongsPage";
 import RecentPage from "@/pages/RecentPage";
+import SongPage from "@/pages/SongPage";
 import NotFound from "@/pages/NotFound";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -32,6 +41,7 @@ const App = () => (
             <Route path="/playlist/:id" element={<PlaylistPage />} />
             <Route path="/liked" element={<LikedSongsPage />} />
             <Route path="/recent" element={<RecentPage />} />
+            <Route path="/song/:id" element={<SongPage />} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

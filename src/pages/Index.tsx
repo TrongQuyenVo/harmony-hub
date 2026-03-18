@@ -1,40 +1,21 @@
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { Play, TrendingUp, Sparkles, Music } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import MusicCard from "@/components/MusicCard";
 import ArtistCard from "@/components/ArtistCard";
 import PlaylistCard from "@/components/PlaylistCard";
 import { usePlayerStore } from "@/stores/playerStore";
 import { fetchTrendingSongs, fetchTrendingArtists, fetchTrendingPlaylists, fetchVietnameseChart, fetchChineseChart } from "@/services/musicApi";
 import { genres } from "@/data/genres";
-import { Song, Artist, Playlist } from "@/types/music";
 
 export default function HomePage() {
-  const [trending, setTrending] = useState<Song[]>([]);
-  const [vietSongs, setVietSongs] = useState<Song[]>([]);
-  const [chineseSongs, setChineseSongs] = useState<Song[]>([]);
-  const [artists, setArtists] = useState<Artist[]>([]);
-  const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const { playSong } = usePlayerStore();
 
-  useEffect(() => {
-    async function load() {
-      const [songs, artistsData, playlistsData, viet, chinese] = await Promise.all([
-        fetchTrendingSongs(),
-        fetchTrendingArtists(),
-        fetchTrendingPlaylists(),
-        fetchVietnameseChart(),
-        fetchChineseChart(),
-      ]);
-      setTrending(songs);
-      setArtists(artistsData);
-      setPlaylists(playlistsData);
-      setVietSongs(viet);
-      setChineseSongs(chinese);
-    }
-
-    load();
-  }, []);
+  const { data: trending = [] } = useQuery({ queryKey: ["trending"], queryFn: fetchTrendingSongs });
+  const { data: vietSongs = [] } = useQuery({ queryKey: ["chart-viet"], queryFn: fetchVietnameseChart });
+  const { data: chineseSongs = [] } = useQuery({ queryKey: ["chart-chinese"], queryFn: fetchChineseChart });
+  const { data: artists = [] } = useQuery({ queryKey: ["trending-artists"], queryFn: fetchTrendingArtists });
+  const { data: playlists = [] } = useQuery({ queryKey: ["trending-playlists"], queryFn: fetchTrendingPlaylists });
 
   const handlePlayAll = () => {
     if (trending.length > 0) playSong(trending[0], trending);
@@ -54,18 +35,10 @@ export default function HomePage() {
             <Sparkles className="w-5 h-5 text-primary" />
             <span className="text-sm font-medium text-primary">Trending Now</span>
           </div>
-          <h1 className="text-3xl md:text-5xl font-bold text-foreground mb-2">
-            Discover New Music
-          </h1>
-          <p className="text-muted-foreground mb-6 max-w-lg">
-            Stream millions of songs. Find your next favorite track with personalized recommendations.
-          </p>
-          <button
-            onClick={handlePlayAll}
-            className="gradient-primary px-6 py-3 rounded-full font-semibold text-primary-foreground shadow-glow hover:scale-105 transition-transform flex items-center gap-2"
-          >
-            <Play className="w-5 h-5" />
-            Play Trending
+          <h1 className="text-3xl md:text-5xl font-bold text-foreground mb-2">Discover New Music</h1>
+          <p className="text-muted-foreground mb-6 max-w-lg">Stream millions of songs. Find your next favorite track.</p>
+          <button onClick={handlePlayAll} className="gradient-primary px-6 py-3 rounded-full font-semibold text-primary-foreground shadow-glow hover:scale-105 transition-transform flex items-center gap-2">
+            <Play className="w-5 h-5" /> Play Trending
           </button>
         </div>
       </motion.section>
@@ -83,7 +56,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Nhạc Việt */}
       {vietSongs.length > 0 && (
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -98,7 +70,6 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Nhạc Trung */}
       {chineseSongs.length > 0 && (
         <section>
           <div className="flex items-center gap-2 mb-4">
@@ -113,16 +84,11 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Browse genres */}
       <section>
         <h2 className="text-xl font-bold text-foreground mb-4">Browse Genres</h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
           {genres.map((genre, i) => (
-            <motion.div
-              key={genre.id}
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: i * 0.05 }}
+            <motion.div key={genre.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}
               className={`bg-gradient-to-br ${genre.color} rounded-xl p-4 h-24 flex items-end cursor-pointer hover:scale-[1.02] transition-transform shadow-card`}
             >
               <span className="text-sm font-bold text-foreground drop-shadow-lg">{genre.name}</span>
@@ -131,14 +97,11 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Featured playlists */}
       {playlists.length > 0 && (
         <section>
           <h2 className="text-xl font-bold text-foreground mb-4">Featured Playlists</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {playlists.map((pl, i) => (
-              <PlaylistCard key={pl.id} playlist={pl} index={i} />
-            ))}
+            {playlists.map((pl, i) => (<PlaylistCard key={pl.id} playlist={pl} index={i} />))}
           </div>
         </section>
       )}
@@ -147,14 +110,11 @@ export default function HomePage() {
         <section>
           <h2 className="text-xl font-bold text-foreground mb-4">Popular Artists</h2>
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {artists.map((artist, i) => (
-              <ArtistCard key={artist.id} artist={artist} index={i} />
-            ))}
+            {artists.map((artist, i) => (<ArtistCard key={artist.id} artist={artist} index={i} />))}
           </div>
         </section>
       )}
 
-      {/* Top charts as list */}
       <section>
         <div className="flex items-center gap-2 mb-4">
           <Music className="w-5 h-5 text-primary" />
