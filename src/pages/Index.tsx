@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Play, TrendingUp, Sparkles, Music } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -6,10 +7,11 @@ import ArtistCard from "@/components/ArtistCard";
 import PlaylistCard from "@/components/PlaylistCard";
 import { usePlayerStore } from "@/stores/playerStore";
 import { fetchTrendingSongs, fetchTrendingArtists, fetchTrendingPlaylists, fetchVietnameseChart, fetchChineseChart } from "@/services/musicApi";
-import { genres } from "@/data/genres";
+import { genres, categories } from "@/data/genres";
 
 export default function HomePage() {
   const { playSong } = usePlayerStore();
+  const [activeCategory, setActiveCategory] = useState<string>("music");
 
   const { data: trending = [] } = useQuery({ queryKey: ["trending"], queryFn: fetchTrendingSongs });
   const { data: vietSongs = [] } = useQuery({ queryKey: ["chart-viet"], queryFn: fetchVietnameseChart });
@@ -20,6 +22,8 @@ export default function HomePage() {
   const handlePlayAll = () => {
     if (trending.length > 0) playSong(trending[0], trending);
   };
+
+  const filteredGenres = genres.filter((g) => g.category === activeCategory);
 
   return (
     <div className="px-4 md:px-6 py-6 space-y-10">
@@ -84,10 +88,26 @@ export default function HomePage() {
         </section>
       )}
 
+      {/* Browse by Category */}
       <section>
-        <h2 className="text-xl font-bold text-foreground mb-4">Browse Genres</h2>
+        <h2 className="text-xl font-bold text-foreground mb-4">Browse Categories</h2>
+        <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+          {categories.map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setActiveCategory(cat.id)}
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                activeCategory === cat.id
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-muted text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {genres.map((genre, i) => (
+          {filteredGenres.map((genre, i) => (
             <motion.div key={genre.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: i * 0.05 }}
               className={`bg-gradient-to-br ${genre.color} rounded-xl p-4 h-24 flex items-end cursor-pointer hover:scale-[1.02] transition-transform shadow-card`}
             >

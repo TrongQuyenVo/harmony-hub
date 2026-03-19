@@ -1,25 +1,29 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
+import { X, Clock, Search } from "lucide-react";
 import MusicCard from "@/components/MusicCard";
 import ArtistCard from "@/components/ArtistCard";
 import { searchSongs, searchArtists, fetchTrendingSongs, fetchTrendingArtists } from "@/services/musicApi";
+import { useSearchStore } from "@/stores/searchStore";
 import { genres } from "@/data/genres";
 import { Artist, Song } from "@/types/music";
 
 export default function SearchPage() {
-  const [params] = useSearchParams();
+  const [params, setParams] = useSearchParams();
   const query = params.get("q") || "";
   const [results, setResults] = useState<Song[]>([]);
   const [artistResults, setArtistResults] = useState<Artist[]>([]);
   const [topSongs, setTopSongs] = useState<Song[]>([]);
   const [topArtists, setTopArtists] = useState<Artist[]>([]);
   const [loading, setLoading] = useState(false);
+  const { history, addToHistory, removeFromHistory, clearHistory } = useSearchStore();
 
   useEffect(() => {
     async function runSearch() {
       setLoading(true);
       if (query) {
+        addToHistory(query);
         const [songs, artists] = await Promise.all([
           searchSongs(query),
           searchArtists(query),
@@ -40,12 +44,51 @@ export default function SearchPage() {
     runSearch();
   }, [query]);
 
-  const filteredArtists = query ? artistResults : [];
+  const handleHistoryClick = (q: string) => {
+    setParams({ q });
+  };
 
   return (
     <div className="px-4 md:px-6 py-6 space-y-8">
       {query === "" ? (
         <>
+          {/* Search History */}
+          {history.length > 0 && (
+            <section>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <h2 className="text-base font-semibold text-foreground">Recent Searches</h2>
+                </div>
+                <button onClick={clearHistory} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+                  Clear all
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {history.map((h) => (
+                  <div
+                    key={h}
+                    className="flex items-center gap-1.5 bg-muted/60 hover:bg-muted rounded-full px-3 py-1.5 cursor-pointer transition-colors group"
+                  >
+                    <Search className="w-3 h-3 text-muted-foreground" />
+                    <span
+                      onClick={() => handleHistoryClick(h)}
+                      className="text-sm text-foreground"
+                    >
+                      {h}
+                    </span>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); removeFromHistory(h); }}
+                      className="text-muted-foreground hover:text-foreground opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
             <h1 className="text-2xl font-bold text-foreground mb-6">Browse All</h1>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
@@ -97,18 +140,8 @@ export default function SearchPage() {
             </div>
           ) : (
             <>
-              {filteredArtists.length > 0 && (
-                <section className="mb-8">
-                  <h2 className="text-lg font-bold text-foreground mb-4">Artists</h2>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {filteredArtists.map((a, i) => (
-                      <ArtistCard key={a.id} artist={a} index={i} />
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              <section>
+              {/* Songs first */}
+              <section className="mb-8">
                 <h2 className="text-lg font-bold text-foreground mb-4">Songs</h2>
                 {results.length > 0 ? (
                   <div className="bg-card rounded-xl border border-border overflow-hidden">
@@ -117,9 +150,20 @@ export default function SearchPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-muted-foreground py-10 text-center">No results found</p>
+                  <p className="text-muted-foreground py-4 text-center text-sm">No songs found</p>
                 )}
               </section>
+
+              {artistResults.length > 0 && (
+                <section>
+                  <h2 className="text-lg font-bold text-foreground mb-4">Artists</h2>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                    {artistResults.map((a, i) => (
+                      <ArtistCard key={a.id} artist={a} index={i} />
+                    ))}
+                  </div>
+                </section>
+              )}
             </>
           )}
         </motion.div>

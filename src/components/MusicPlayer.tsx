@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Play, Pause, SkipBack, SkipForward, Shuffle, Repeat, Repeat1,
-  Volume2, VolumeX, Volume1, Mic2, Heart, ListMusic, Loader2, X, ChevronUp
+  Volume2, VolumeX, Volume1, Mic2, Heart, ListMusic, Loader2, X
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePlayerStore } from "@/stores/playerStore";
 import { useLibraryStore } from "@/stores/libraryStore";
 import { useYouTubePlayer } from "@/hooks/useYouTubePlayer";
+import { useMediaSession } from "@/hooks/useMediaSession";
 import { Slider } from "@/components/ui/slider";
 import { useNavigate } from "react-router-dom";
 
@@ -22,13 +23,16 @@ export default function MusicPlayer() {
     currentSong, isPlaying, volume, progress, duration,
     shuffle, repeat, queue, queueIndex, togglePlay, nextSong, prevSong,
     setVolume, setProgress, setDuration, toggleShuffle,
-    toggleRepeat, toggleLyrics, showLyrics, setPlaying
+    toggleRepeat, setPlaying
   } = usePlayerStore();
   const { toggleLike, isLiked, addToRecentlyPlayed } = useLibraryStore();
   const [loading, setLoading] = useState(false);
   const [showQueue, setShowQueue] = useState(false);
   const lastSongIdRef = useRef<string | null>(null);
   const navigate = useNavigate();
+
+  // Media Session for background playback
+  useMediaSession();
 
   const ytPlayer = useYouTubePlayer({
     onProgress: (time) => setProgress(time),
@@ -210,7 +214,7 @@ export default function MusicPlayer() {
           <div className="hidden md:flex items-center gap-2 w-[30%] justify-end">
             <button
               onClick={() => navigate(`/song/${currentSong.id}`)}
-              className={cn("p-1.5 transition-colors", showLyrics ? "text-primary" : "text-muted-foreground hover:text-foreground")}
+              className="p-1.5 transition-colors text-muted-foreground hover:text-foreground"
               title="View lyrics"
             >
               <Mic2 className="w-4 h-4" />
